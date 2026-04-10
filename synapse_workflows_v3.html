@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project Synapse · Workflow Architecture v3.0</title>
+<style>
+:root{
+  --bg:#070a0f;--surf:#0d1117;--surf2:#111827;--surf3:#1a2235;
+  --brd:#1e2d45;--brd2:#253349;
+  --gold:#c9a84c;--gold2:rgba(201,168,76,.12);--gold3:rgba(201,168,76,.06);
+  --cyan:#00d4ff;--cyan2:rgba(0,212,255,.1);
+  --grn:#22c55e;--grn2:rgba(34,197,94,.12);
+  --amb:#f59e0b;--amb2:rgba(245,158,11,.12);
+  --red:#ef4444;--red2:rgba(239,68,68,.12);
+  --slate:#475569;--muted:#64748b;--dim:#334155;
+  --txt:#e2e8f0;--txt2:#94a3b8;--txt3:#64748b;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{min-height:100%;background:var(--bg);color:var(--txt);font-family:'Segoe UI',-apple-system,system-ui,sans-serif;font-size:13px;overflow-x:hidden}
+
+/* ── GRID BG ── */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(201,168,76,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(201,168,76,.025) 1px,transparent 1px);
+  background-size:48px 48px}
+
+/* ── HEADER ── */
+header{position:relative;z-index:10;background:rgba(7,10,15,.95);
+  border-bottom:1px solid var(--brd);padding:0 24px;display:flex;
+  align-items:center;gap:20px;height:56px;backdrop-filter:blur(8px)}
+.logo{font-size:.85rem;font-weight:700;color:var(--gold);letter-spacing:.06em;white-space:nowrap}
+.logo-sub{font-size:.65rem;color:var(--muted);margin-top:1px}
+.hstats{margin-left:auto;display:flex;gap:24px;align-items:center}
+.hstat{text-align:center}
+.hstat .v{font-size:1rem;font-weight:700;color:var(--txt);display:block}
+.hstat .l{font-size:.6rem;color:var(--txt3);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
+.v.g{color:var(--grn)} .v.a{color:var(--amb)} .v.r{color:var(--red)} .v.c{color:var(--cyan)}
+.div1{width:1px;height:28px;background:var(--brd)}
+
+/* ── TABS ── */
+.tabbar{position:relative;z-index:10;background:rgba(13,17,23,.95);
+  border-bottom:1px solid var(--brd);display:flex;overflow-x:auto;
+  scrollbar-width:none;backdrop-filter:blur(4px)}
+.tabbar::-webkit-scrollbar{display:none}
+.tab{padding:0 18px;height:44px;display:flex;align-items:center;gap:8px;
+  cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;
+  font-size:.72rem;font-weight:600;color:var(--txt3);transition:.15s;user-select:none}
+.tab:hover{color:var(--txt2)}
+.tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+.tbadge{font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:.04em}
+.tg{background:rgba(34,197,94,.15);color:var(--grn);border:1px solid rgba(34,197,94,.3)}
+.ta{background:rgba(245,158,11,.15);color:var(--amb);border:1px solid rgba(245,158,11,.3)}
+.tr{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.ts{background:rgba(0,212,255,.12);color:var(--cyan);border:1px solid rgba(0,212,255,.25)}
+
+/* ── WORKFLOW PANE ── */
+.wfp{display:none;flex-direction:column;height:calc(100vh - 104px)}
+.wfp.on{display:flex}
+
+/* ── INFO BAR ── */
+.ibar{background:rgba(13,17,23,.8);border-bottom:1px solid var(--brd);
+  padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;z-index:5}
+.ibar-name{font-size:.85rem;font-weight:700;color:var(--txt)}
+.ibar-badge{padding:3px 12px;border-radius:999px;font-size:.64rem;font-weight:700;letter-spacing:.06em}
+.ib-g{background:rgba(34,197,94,.15);color:var(--grn);border:1px solid rgba(34,197,94,.3)}
+.ib-a{background:rgba(245,158,11,.15);color:var(--amb);border:1px solid rgba(245,158,11,.3)}
+.ib-r{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.ib-s{background:rgba(0,212,255,.12);color:var(--cyan);border:1px solid rgba(0,212,255,.25)}
+.ibar-meta{font-size:.7rem;color:var(--txt3);flex:1;min-width:220px}
+.prog-outer{height:3px;background:var(--brd2);border-radius:2px;width:120px;overflow:hidden}
+.prog-inner{height:100%;border-radius:2px;transition:width 1.2s cubic-bezier(.16,1,.3,1)}
+
+/* ── CANVAS ── */
+.cvs{flex:1;overflow:auto;position:relative;cursor:grab}
+.cvs:active{cursor:grabbing}
+.cvs svg{display:block;min-width:100%}
+
+/* ── LEGEND ── */
+.legend{background:rgba(7,10,15,.95);border-top:1px solid var(--brd);
+  padding:9px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  z-index:5;backdrop-filter:blur(4px)}
+.leg-t{font-size:.62rem;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.1em}
+.leg-i{display:flex;align-items:center;gap:6px;font-size:.68rem;color:var(--txt2)}
+.leg-dot{width:8px;height:8px;border-radius:50%}
+.leg-i.sm{margin-left:auto;color:var(--txt3);font-size:.62rem}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse-g{0%,100%{opacity:.95;r:4.5}50%{opacity:.4;r:3.5}}
+@keyframes pulse-a{0%,100%{opacity:.9;r:4.5}50%{opacity:.35;r:3.5}}
+@keyframes pulse-r{0%,100%{opacity:.85;r:4.5}50%{opacity:.25;r:3.5}}
+@keyframes flow{to{stroke-dashoffset:-60}}
+@keyframes fadein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.wfp.on{animation:fadein .35s ease}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">◈ PROJECT SYNAPSE · SOC FACTORY</div>
+    <div class="logo-sub">Workflow Architecture v3.0 · CyberShield MSSP · Phase 22 Complete</div>
+  </div>
+  <div class="hstats">
+    <div class="div1"></div>
+    <div class="hstat"><span class="v g">44/44</span><span class="l">Tests Pass</span></div>
+    <div class="hstat"><span class="v">84%</span><span class="l">Automation</span></div>
+    <div class="div1"></div>
+    <div class="hstat"><span class="v g">29</span><span class="l">Verified</span></div>
+    <div class="hstat"><span class="v a">7</span><span class="l">Partial</span></div>
+    <div class="hstat"><span class="v r">4</span><span class="l">Gaps</span></div>
+    <div class="div1"></div>
+    <div class="hstat"><span class="v c">189f1da</span><span class="l">Last Commit</span></div>
+  </div>
+</header>
+
+<div class="tabbar" id="tbr"></div>
+<div id="main"></div>
+<div class="legend">
+  <span class="leg-t">Status:</span>
+  <span class="leg-i"><span class="leg-dot" style="background:var(--grn)"></span>VERIFIED — Built &amp; tested (44/44 suite)</span>
+  <span class="leg-i"><span class="leg-dot" style="background:var(--amb)"></span>PARTIAL — Mock-only / live-test pending</span>
+  <span class="leg-i"><span class="leg-dot" style="background:var(--slate)"></span>PENDING — Not yet built</span>
+  <span class="leg-i"><span class="leg-dot" style="background:var(--red)"></span>CRITICAL GAP — Blocks service launch</span>
+  <span class="leg-i"><span class="leg-dot" style="background:#7c3aed"></span>CREDENTIAL NODE — Sensitive input handler</span>
+  <span class="leg-i sm">Drag to pan · Scroll to zoom (pinch on mobile)</span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DESIGN CONSTANTS
+// ═══════════════════════════════════════════════════════════════════
+const NW=162, NH=64, GAP_X=220, GAP_Y=92, PAD=52;
+
+const CATS={
+  TRIGGER:  {bg:'#0a1929',brd:'#1e3a5f',ic:'▶'},
+  INPUT:    {bg:'#0d1f17',brd:'#1e4a33',ic:'↓'},
+  SCAN:     {bg:'#0f1729',brd:'#2563eb',ic:'⟲'},
+  LLM:      {bg:'#1a0a2e',brd:'#7c3aed',ic:'✦'},
+  PROCESS:  {bg:'#0d1117',brd:'#334155',ic:'⚙'},
+  ROUTER:   {bg:'#1a1500',brd:'#854d0e',ic:'⇌'},
+  OUTPUT:   {bg:'#0a1f14',brd:'#166534',ic:'→'},
+  NOTIFY:   {bg:'#1a1a0a',brd:'#a16207',ic:'◉'},
+  STORE:    {bg:'#080d28',brd:'#1e3a8a',ic:'◫'},
+  PLAYBOOK: {bg:'#19052e',brd:'#6d28d9',ic:'☰'},
+  CRED:     {bg:'#1a0520',brd:'#7c3aed',ic:'🔑'},
+  SCORE:    {bg:'#0d1f1a',brd:'#0d9488',ic:'★'},
+};
+
+const STATUS={
+  G:  {dot:'#22c55e',glow:'rgba(34,197,94,.35)',   ring:'#22c55e',mkt:'sg', anim:'pulse-g'},
+  AM: {dot:'#f59e0b',glow:'rgba(245,158,11,.3)',    ring:'#f59e0b',mkt:'sa', anim:'pulse-a'},
+  GR: {dot:'#475569',glow:'rgba(71,85,105,.2)',     ring:'#475569',mkt:'sm', anim:''},
+  RD: {dot:'#ef4444',glow:'rgba(239,68,68,.35)',    ring:'#ef4444',mkt:'sr', anim:'pulse-r'},
+  CR: {dot:'#7c3aed',glow:'rgba(124,58,237,.35)',   ring:'#7c3aed',mkt:'sc', anim:'pulse-a'},
+};
+
+function cx(col){return PAD + col * GAP_X}
+function cy(row){return PAD + row * GAP_Y}
+function mid(a,b){return (a+b)/2}
+
+// ═══════════════════════════════════════════════════════════════════
+// WORKFLOW DEFINITIONS
+// Node: [id, col, row, title, subtitle, category, status]
+// Edge: [from, to, label, style?] style: 'dash'|null
+// ═══════════════════════════════════════════════════════════════════
+const WFS = [
+
+// ────────────────────────────────────────────────────────────────
+// WF-01 · EMAIL SECURITY ASSESSMENT
+// ────────────────────────────────────────────────────────────────
+{id:'wf01', pct:100, badge:'PRODUCTION READY', bc:'tg', ibc:'ib-g',
+ name:'WF-01 · Email Security Assessment',
+ meta:'Fastest close · DNS-only · No credentials needed · 94% automation · Fully automated report + delivery',
+ W: cx(8)+NW+PAD, H: cy(4)+NH+PAD,
+ nodes:[
+  ['T01',0,1,  'Client Request',  'Domain list + scope',  'TRIGGER','G'],
+  ['I01',1,1,  'Input Collector', 'Domain validator',     'INPUT','G'],
+  ['D01',2,0,  'DNS Tool',        'SPF/DKIM/DMARC/MX',   'SCAN','G'],
+  ['VT1',2,1,  'VirusTotal',      'Domain reputation',    'SCAN','G'],
+  ['BL1',2,2,  'Blacklist RBL',   'Spamhaus / Spamcop',  'SCAN','G'],
+  ['AG1',3,1,  'Aggregator',      'Merge + FP filter',   'PROCESS','G'],
+  ['VS1',4,1,  'Vector Store',    'Client RAG context',  'STORE','G'],
+  ['LM1',5,1,  'LLM Triage',      'Gemini 2.5 Flash',    'LLM','G'],
+  ['CS1',6,1,  'Compliance Score','0-100 · Grade A–F',   'SCORE','G'],
+  ['RG1',7,1,  'Report Generator','Markdown + summary',  'OUTPUT','G'],
+  ['EM1',8,0,  'Email Delivery',  'SMTP connector',      'NOTIFY','AM'],
+  ['TG1',8,2,  'Telegram Alert',  'Findings channel',    'NOTIFY','AM'],
+ ],
+ edges:[
+  ['T01','I01',null],['I01','D01','domain'],['I01','VT1','domain'],['I01','BL1','domain'],
+  ['D01','AG1','findings'],['VT1','AG1','score'],['BL1','AG1','listed?'],
+  ['AG1','VS1','merged'],['VS1','LM1','context+data'],['LM1','CS1','findings'],
+  ['CS1','RG1','score+grade'],
+  ['RG1','EM1','report PDF'],['RG1','TG1','alert msg'],
+]},
+
+// ────────────────────────────────────────────────────────────────
+// WF-02 · BASELINE SECURITY ASSESSMENT
+// ────────────────────────────────────────────────────────────────
+{id:'wf02', pct:97, badge:'PRODUCTION READY', bc:'tg', ibc:'ib-g',
+ name:'WF-02 · Cybersecurity Baseline Assessment',
+ meta:'Core lead-in offer · Nmap + DNS + Subfinder + VirusTotal pipeline · 88% automation · Drives all SOC upsells',
+ W: cx(9)+NW+PAD, H: cy(5)+NH+PAD,
+ nodes:[
+  ['T02',0,2,  'Client Request',  'Domain / IP + scope', 'TRIGGER','G'],
+  ['I02',1,2,  'Input Collector', 'Scope validator',     'INPUT','G'],
+  ['NM2',2,0,  'Nmap Scanner',    'Port + service map',  'SCAN','G'],
+  ['DN2',2,1,  'DNS Tool',        'SPF/DKIM/DMARC/BIMI', 'SCAN','G'],
+  ['SF2',2,2,  'Subfinder',       'Subdomain EASM',      'SCAN','G'],
+  ['VT2',2,3,  'VirusTotal',      'IP/domain reputation','SCAN','G'],
+  ['BL2',2,4,  'Blacklist RBL',   'Email reputation',    'SCAN','G'],
+  ['AG2',3,2,  'Aggregator',      'Merge + FP filter',   'PROCESS','G'],
+  ['NV2',4,1,  'NVD Matcher',     'CVE stack cross-ref', 'SCAN','G'],
+  ['DT2',4,3,  'Delta Analyzer',  'Drift detection',     'PROCESS','G'],
+  ['VS2',5,2,  'Vector Store',    'Client RAG context',  'STORE','G'],
+  ['LM2',6,2,  'LLM Triage',      'Gemini 2.5 Flash',    'LLM','G'],
+  ['CS2',7,2,  'Compliance Score','0-100 · Grade A–F',   'SCORE','G'],
+  ['RG2',8,2,  'Report Generator','Executive + technical','OUTPUT','G'],
+  ['EM2',9,1,  'Email Delivery',  'SMTP connector',      'NOTIFY','AM'],
+  ['TG2',9,3,  'Telegram Alert',  'Findings channel',    'NOTIFY','AM'],
+ ],
+ edges:[
+  ['T02','I02',null],
+  ['I02','NM2','domain'],['I02','DN2','domain'],['I02','SF2','domain'],
+  ['I02','VT2','domain'],['I02','BL2','domain'],
+  ['NM2','AG2','ports'],['DN2','AG2','dns'],['SF2','AG2','subs'],
+  ['VT2','AG2','rep'],['BL2','AG2','bl'],
+  ['AG2','NV2','tech stack'],['AG2','DT2','current scan'],
+  ['NV2','VS2','cves'],['DT2','VS2','diff'],
+  ['VS2','LM2','full context'],['LM2','CS2','findings'],
+  ['CS2','RG2','score'],['RG2','EM2','report'],['RG2','TG2','alert'],
+]},
+
+// ────────────────────────────────────────────────────────────────
+// WF-03 · FULL VULNERABILITY ASSESSMENT
+// ────────────────────────────────────────────────────────────────
+{id:'wf03', pct:84, badge:'PARTIAL — testssl ⚠ path issue', bc:'ta', ibc:'ib-a',
+ name:'WF-03 · Full Vulnerability Assessment',
+ meta:'CVE scoring + NVD matching + TLS audit · testssl returns error status — fix binary path · 92% scan automation otherwise complete',
+ W: cx(10)+NW+PAD, H: cy(6)+NH+PAD,
+ nodes:[
+  ['T03',0,2.5,'Client Request',  'Target + scope brief','TRIGGER','G'],
+  ['I03',1,2.5,'Input Collector', 'Scope validator',    'INPUT','G'],
+  ['NM3',2,0,  'Nmap Full',       'All ports + scripts','SCAN','G'],
+  ['DN3',2,1,  'DNS Tool',        'SPF/DKIM/DMARC',    'SCAN','G'],
+  ['NC3',2,2,  'Nuclei CVE',      'Vuln templates',     'SCAN','G'],
+  ['SF3',2,3,  'Subfinder',       'Subdomain EASM',     'SCAN','G'],
+  ['VT3',2,4,  'VirusTotal',      'IP reputation',      'SCAN','G'],
+  ['TL3',2,5,  'testssl.sh',      'TLS/cipher audit',   'SCAN','AM'],
+  ['AG3',3,2.5,'Aggregator',      'Merge + normalize',  'PROCESS','G'],
+  ['NV3',4,1.5,'NVD Matcher',     'CVE stack cross-ref','SCAN','G'],
+  ['BL3',4,3.5,'Blacklist RBL',   'Reputation check',   'SCAN','G'],
+  ['VS3',5,2.5,'Vector Store',    'Client RAG context', 'STORE','G'],
+  ['LM3',6,2.5,'LLM Triage',      'Gemini 2.5 Flash',   'LLM','G'],
+  ['DT3',7,1.5,'Delta Analyzer',  'New CVEs / ports',   'PROCESS','G'],
+  ['CS3',7,3.5,'Compliance Score','0-100 · Grade A–F',  'SCORE','G'],
+  ['RG3',8,2.5,'Report Generator','Full pentest report', 'OUTPUT','G'],
+  ['EM3',9,1.5,'Email Delivery',  'SMTP connector',     'NOTIFY','AM'],
+  ['TG3',9,3.5,'Telegram Alert',  'Findings channel',   'NOTIFY','AM'],
+ ],
+ edges:[
+  ['T03','I03',null],
+  ['I03','NM3','scope'],['I03','DN3','domain'],['I03','NC3','target'],
+  ['I03','SF3','domain'],['I03','VT3','ip'],['I03','TL3','domain'],
+  ['NM3','AG3','ports'],['DN3','AG3','dns'],['NC3','AG3','cves'],
+  ['SF3','AG3','subs'],['VT3','AG3','rep'],['TL3','AG3','tls'],
+  ['AG3','NV3','tech stack'],['AG3','BL3','ips'],
+  ['NV3','VS3','cves'],['BL3','VS3','bl'],
+  ['VS3','LM3','full context'],['LM3','DT3','findings'],['LM3','CS3','findings'],
+  ['DT3','RG3','drift'],['CS3','RG3','score'],
+  ['RG3','EM3','report'],['RG3','TG3','alert'],
+]},
+
+// ────────────────────────────────────────────────────────────────
+// WF-04 · GRC GAP ASSESSMENT
+// ────────────────────────────────────────────────────────────────
+{id:'wf04', pct:65, badge:'INCOMPLETE — NCA ECC mapper missing', bc:'tr', ibc:'ib-r',
+ name:'WF-04 · GRC Gap Assessment',
+ meta:'CRITICAL GAP: NCA ECC 57-control mapper not built · Compliance engine exists but not framework-linked · Highest commercial value entry point',
+ W: cx(9)+NW+PAD, H: cy(5)+NH+PAD,
+ nodes:[
+  ['T04',0,2,  'Client Request',  'Domain + industry',   'TRIGGER','G'],
+  ['I04',1,2,  'Input Collector', 'Framework selector',  'INPUT','G'],
+  ['NM4',2,0,  'Nmap Basic',      'Exposure snapshot',   'SCAN','G'],
+  ['DN4',2,1,  'DNS Tool',        'Email controls',      'SCAN','G'],
+  ['NC4',2,3,  'Nuclei Basic',    'Surface vulns',       'SCAN','G'],
+  ['NK4',3,2,  'NCA ECC Mapper',  '57 controls→findings','PROCESS','RD'],
+  ['PD4',4,1,  'PDPL Mapper',     'UAE PDPL articles',   'PROCESS','RD'],
+  ['VS4',5,2,  'Vector Store',    'Client RAG context',  'STORE','G'],
+  ['LM4',6,2,  'LLM GRC',        'Gemini 2.5 Flash',    'LLM','G'],
+  ['RR4',7,2,  'Risk Register',   'Top-15 risks draft',  'PROCESS','GR'],
+  ['RG4',8,2,  'Report Generator','Gap report + roadmap','OUTPUT','G'],
+  ['EM4',9,1,  'Email Delivery',  'SMTP connector',      'NOTIFY','AM'],
+  ['TG4',9,3,  'Telegram Alert',  'Findings channel',    'NOTIFY','AM'],
+ ],
+ edges:[
+  ['T04','I04',null],
+  ['I04','NM4','domain'],['I04','DN4','domain'],['I04','NC4','target'],
+  ['NM4','NK4','exposure'],['DN4','NK4','dns controls'],['NC4','NK4','vulns'],
+  ['NK4','PD4','gap data'],['NK4','VS4','mapped'],['PD4','VS4','pdpl gaps'],
+  ['VS4','LM4','full context'],
+  ['LM4','RR4','raw findings'],['RR4','RG4','risk list'],
+  ['RG4','EM4','gap report'],['RG4','TG4','alert'],
+]},
+
+// ────────────────────────────────────────────────────────────────
+// WF-05 · SOC CONTINUOUS MONITORING
+// ────────────────────────────────────────────────────────────────
+{id:'wf05', pct:82, badge:'PARTIAL — Wazuh live webhook pending', bc:'ta', ibc:'ib-a',
+ name:'WF-05 · SOC Continuous Monitoring (Dual-Path)',
+ meta:'PATH A: Scheduled scan (weekly/monthly cron) · PATH B: Real-time Wazuh SIEM alerts · 6 playbooks dry-run verified · Live SIEM is sole remaining gap',
+ W: cx(10)+NW+PAD, H: cy(8)+NH+PAD,
+ nodes:[
+  // PATH A — Scheduled
+  ['SA0',0,0,  'Scheduler Cron',  'Weekly / monthly',    'TRIGGER','G'],
+  ['SA1',1,0,  'Multi-scan',      'All client tools',    'SCAN','G'],
+  ['SA2',2,0,  'Aggregator',      'Merge + normalize',   'PROCESS','G'],
+  ['SA3',3,0,  'NVD Matcher',     'CVE stack match',     'SCAN','G'],
+  ['SA4',4,0,  'Delta Analyzer',  'Drift detection',     'PROCESS','G'],
+  ['SA5',5,0,  'Vector Store',    'Client RAG context',  'STORE','G'],
+  ['SA6',6,0,  'LLM Triage',      'Gemini 2.5 Flash',    'LLM','G'],
+  ['SA7',7,0,  'Compliance Score','0-100 · Grade A–F',   'SCORE','G'],
+  ['SA8',8,0,  'Report Generator','Monthly report',      'OUTPUT','G'],
+  ['SA9',9,0,  'Email Delivery',  'Auto-send monthly',   'NOTIFY','AM'],
+  // PATH B — Real-time Wazuh
+  ['SB0',0,4,  'Wazuh SIEM',      'Real-time alert',     'TRIGGER','AM'],
+  ['SB1',1,4,  'Webhook Server',  'Flask /alert endpoint','INPUT','G'],
+  ['SB2',2,4,  'GeoIP Enrich',    'Country+ASN lookup',  'PROCESS','G'],
+  ['SB3',3,4,  'Safety Guard',    'RFC1918/CDN protect', 'PROCESS','G'],
+  ['SB4',4,4,  'Alert Router',    '15 routing rules',    'ROUTER','G'],
+  ['SB5',5,4,  'SOAR Dispatch',   'Playbook selector',   'ROUTER','G'],
+  // Playbooks
+  ['PB1',6,2,  'Web Attack PB',   'PB-002 · CF block',   'PLAYBOOK','G'],
+  ['PB2',6,3,  'Hardening PB',    'SSH advisory+ticket', 'PLAYBOOK','G'],
+  ['PB3',6,4,  'Phishing PB',     'PB-001 · DNS resp.',  'PLAYBOOK','G'],
+  ['PB4',6,5,  'DataExfil PB',    'PB-007 · P1 block',   'PLAYBOOK','G'],
+  ['PB5',6,6,  'Malware PB',      'PB-003 · Escalate',   'PLAYBOOK','G'],
+  ['PB6',6,7,  'Ransomware PB',   'PB-008 · P0 all-ch.', 'PLAYBOOK','G'],
+  // Shared outputs
+  ['OC1',8,3,  'Cloudflare WAF',  'IP block API',        'NOTIFY','AM'],
+  ['OT1',8,5,  'Telegram ×3',     'F / A / Fail chans.', 'NOTIFY','AM'],
+  ['OA1',9,5,  'Audit Log',       'JSONL immutable',     'STORE','G'],
+  ['OD1',9,0,  'Dashboard CLI',   'SOC status view',     'OUTPUT','G'],
+ ],
+ edges:[
+  ['SA0','SA1','all clients'],['SA1','SA2',null],['SA2','SA3',null],
+  ['SA3','SA4',null],['SA4','SA5',null],['SA5','SA6',null],
+  ['SA6','SA7',null],['SA7','SA8',null],['SA8','SA9','report'],
+  ['SA8','OD1','latest'],
+  ['SB0','SB1','POST /alert'],['SB1','SB2','raw alert'],
+  ['SB2','SB3','enriched'],['SB3','SB4','safe IP'],['SB4','SB5','route'],
+  ['SB5','PB1','web_attack'],['SB5','PB2','default_ssh'],
+  ['SB5','PB3','phishing'],['SB5','PB4','data_exfil'],
+  ['SB5','PB5','malware'],['SB5','PB6','ransomware'],
+  ['PB1','OC1','block IP'],['PB4','OC1','block IP'],['PB6','OC1','block IP'],
+  ['PB1','OT1',null],['PB2','OT1',null],['PB3','OT1',null],
+  ['PB4','OT1',null],['PB5','OT1',null],['PB6','OT1',null],
+  ['SB4','OA1','log'],['SB5','OA1','log'],['OT1','OA1','log'],
+]},
+
+// ────────────────────────────────────────────────────────────────
+// WF-06 · WEB APP PENTEST (AUTHENTICATED)
+// ────────────────────────────────────────────────────────────────
+{id:'wf06', pct:44, badge:'INCOMPLETE — 3 critical nodes missing', bc:'tr', ibc:'ib-r',
+ name:'WF-06 · Web App Pentest (Authenticated)',
+ meta:'3 CRITICAL GAPS: Creds Collector + Validator + Nuclei-Auth module not built · Cannot launch pentest service without secure credential handling pipeline',
+ W: cx(10)+NW+PAD, H: cy(6)+NH+PAD,
+ nodes:[
+  ['T06',0,2.5,'Client Request',  'Scope + auth brief',  'TRIGGER','G'],
+  ['IC6',1,2.5,'Creds Collector', 'SSH / token / login', 'CRED','RD'],
+  ['EV6',2,1,  'Encrypt Vault',   'AES-256 at rest',     'CRED','RD'],
+  ['CV6',2,3,  'Cred Validator',  'Safety + scope check','CRED','RD'],
+  ['SG6',3,2.5,'Scope Guard',     'SafetyGuard + rules', 'PROCESS','G'],
+  ['NM6',4,0,  'Nmap Full',       'All ports + scripts', 'SCAN','G'],
+  ['NA6',4,1,  'Nuclei (Auth)',    'Authenticated scan',  'SCAN','RD'],
+  ['TL6',4,2,  'testssl.sh',      'TLS cipher audit',    'SCAN','AM'],
+  ['SF6',4,3,  'Subfinder',       'Subdomain EASM',      'SCAN','G'],
+  ['VT6',4,4,  'VirusTotal',      'Domain reputation',   'SCAN','G'],
+  ['AG6',5,2,  'Aggregator',      'Merge + normalize',   'PROCESS','G'],
+  ['VS6',6,2,  'Vector Store',    'Client RAG context',  'STORE','G'],
+  ['LM6',7,2,  'LLM Pentest',     'OWASP analysis',      'LLM','G'],
+  ['CS6',8,1,  'Compliance Score','CVSS + grade',        'SCORE','G'],
+  ['RG6',8,2,  'Report Generator','Full pentest report', 'OUTPUT','G'],
+  ['EM6',9,1,  'Email Delivery',  'SMTP connector',      'NOTIFY','AM'],
+  ['TG6',9,3,  'Telegram Alert',  'Critical findings',   'NOTIFY','AM'],
+ ],
+ edges:[
+  ['T06','IC6',null],
+  ['IC6','EV6','raw creds'],['IC6','CV6','metadata'],
+  ['EV6','SG6','encrypted'],['CV6','SG6','validated'],
+  ['SG6','NM6','approved'],['SG6','NA6','session token'],
+  ['SG6','TL6','domain'],['SG6','SF6','domain'],['SG6','VT6','domain'],
+  ['NM6','AG6','ports'],['NA6','AG6','auth findings'],
+  ['TL6','AG6','tls'],['SF6','AG6','subs'],['VT6','AG6','rep'],
+  ['AG6','VS6','merged'],['VS6','LM6','context+data'],
+  ['LM6','CS6','findings'],['LM6','RG6','full analysis'],
+  ['CS6','RG6','score'],['RG6','EM6','report'],['RG6','TG6','alert'],
+]},
+
+// ────────────────────────────────────────────────────────────────
+// WF-07 · INCIDENT RESPONSE (EMERGENCY)
+// ────────────────────────────────────────────────────────────────
+{id:'wf07', pct:88, badge:'PARTIAL — Live Wazuh pending', bc:'ta', ibc:'ib-a',
+ name:'WF-07 · Incident Response (Emergency P0–P3)',
+ meta:'P0 Ransomware → P1 DataExfil → P2 Web Attack → P3 Hardening · All 6 playbooks verified dry-run · Live SIEM the only gap',
+ W: cx(9)+NW+PAD, H: cy(7)+NH+PAD,
+ nodes:[
+  ['WH7',0,3,  'Wazuh SIEM',      'Real-time event',     'TRIGGER','AM'],
+  ['WS7',1,3,  'Webhook Server',  'Flask /alert',        'INPUT','G'],
+  ['GE7',2,3,  'GeoIP Enrichment','Country+ASN+Org',     'PROCESS','G'],
+  ['SG7',3,3,  'Safety Guard',    'RFC1918/CDN/WL',      'PROCESS','G'],
+  ['SR7',4,3,  'Severity Router', 'P0 / P1 / P2 / P3',   'ROUTER','G'],
+  ['P07',5,0,  'Ransomware PB',   'PB-008 · P0 all-ch.', 'PLAYBOOK','G'],
+  ['P17',5,1,  'DataExfil PB',    'PB-007 · P1 block',   'PLAYBOOK','G'],
+  ['P27',5,3,  'Web Attack PB',   'PB-002 · CF block',   'PLAYBOOK','G'],
+  ['P37',5,4,  'Phishing PB',     'PB-001 · DNS resp.',  'PLAYBOOK','G'],
+  ['P47',5,5,  'Hardening PB',    'PB-003 · Advisory',   'PLAYBOOK','G'],
+  ['P57',5,6,  'Malware PB',      'Escalate only',       'PLAYBOOK','G'],
+  ['CF7',6,1,  'Cloudflare WAF',  'IP block via API',    'NOTIFY','AM'],
+  ['TG7',7,3,  'Telegram ×3',     'F / A / Fail chans.', 'NOTIFY','AM'],
+  ['AL7',8,3,  'Audit Log',       'JSONL immutable',     'STORE','G'],
+  ['HT7',8,5,  'Hardening Ticket','JSON ticket file',    'OUTPUT','G'],
+ ],
+ edges:[
+  ['WH7','WS7','POST /alert'],['WS7','GE7','raw'],
+  ['GE7','SG7','enriched'],['SG7','SR7','safe IP'],
+  ['SR7','P07','severity=P0'],['SR7','P17','severity=P1'],
+  ['SR7','P27','severity=P2'],['SR7','P37','type=phish'],
+  ['SR7','P47','type=ssh'],['SR7','P57','type=malware'],
+  ['P07','CF7','block'],['P07','TG7','P0 all channels'],
+  ['P17','CF7','block'],['P17','TG7','P1 alert'],
+  ['P27','CF7','block'],['P27','TG7','P2 alert'],
+  ['P37','TG7','notify'],['P47','HT7','ticket'],['P47','TG7','advisory'],
+  ['P57','TG7','escalate'],
+  ['TG7','AL7','log all'],['CF7','AL7','log block'],
+]},
+
+// ────────────────────────────────────────────────────────────────
+// MASTER SYSTEM ARCHITECTURE
+// ────────────────────────────────────────────────────────────────
+{id:'master', pct:87, badge:'FULL SYSTEM · 38 NODES', bc:'ts', ibc:'ib-s',
+ name:'◈ MASTER · Full System Architecture',
+ meta:'All 7 service workflows · Shared scanning core · Processing layer · SOAR engine · 29 verified + 7 partial + 4 critical gaps · Post Phase-22',
+ W: cx(11)+NW+PAD, H: cy(9)+NH+PAD,
+ nodes:[
+  // ── ENTRY LAYER (col 0) ──
+  ['E01',0,0,  'Email Assess.',   'WF-01',               'TRIGGER','G'],
+  ['E02',0,1,  'Baseline Assess.','WF-02',               'TRIGGER','G'],
+  ['E03',0,2,  'Vuln Assessment', 'WF-03',               'TRIGGER','G'],
+  ['E04',0,3,  'GRC Assessment',  'WF-04',               'TRIGGER','G'],
+  ['E05',0,4,  'SOC Monitoring',  'WF-05 Scheduler',     'TRIGGER','G'],
+  ['E06',0,5,  'Pentest Auth',    'WF-06 + Creds',       'TRIGGER','GR'],
+  ['E07',0,6,  'IR Emergency',    'WF-07 Wazuh',         'TRIGGER','AM'],
+  // ── CREDENTIAL GATE (col 1, pentest only) ──
+  ['CR6',1,5,  'Cred Vault',      'Encrypt + validate',  'CRED','RD'],
+  // ── SCANNING LAYER (col 1-2) ──
+  ['MNM',1,0,  'Nmap Scanner',    'Port+service map',    'SCAN','G'],
+  ['MDN',1,1,  'DNS Tool',        'SPF/DKIM/DMARC/BIMI', 'SCAN','G'],
+  ['MNC',2,0,  'Nuclei CVE',      'Vuln templates',      'SCAN','G'],
+  ['MSF',2,1,  'Subfinder',       'Subdomain EASM',      'SCAN','G'],
+  ['MVT',2,2,  'VirusTotal',      'IP/domain rep.',      'SCAN','G'],
+  ['MBL',2,3,  'Blacklist RBL',   'Email reputation',    'SCAN','G'],
+  ['MTL',2,4,  'testssl.sh',      'TLS/cipher audit',    'SCAN','AM'],
+  // ── PROCESSING CORE (col 3-4) ──
+  ['MAG',3,1,  'Aggregator',      'All-tool merge+FP',   'PROCESS','G'],
+  ['MSG',3,5,  'Safety Guard',    'RFC1918/CDN/WL',      'PROCESS','G'],
+  ['MNV',4,0,  'NVD Matcher',     'CVE stack cross-ref', 'SCAN','G'],
+  ['MDT',4,1,  'Delta Analyzer',  'Drift detection',     'PROCESS','G'],
+  ['MNK',4,3,  'NCA ECC Mapper',  '57 controls — MISSING','PROCESS','RD'],
+  ['MAR',4,5,  'Alert Router',    '15 routing rules',    'ROUTER','G'],
+  // ── AI + STORAGE (col 5-6) ──
+  ['MVS',5,1,  'Vector Store',    'Client RAG memory',   'STORE','G'],
+  ['MSD',5,5,  'SOAR Dispatcher', '6 playbooks ready',   'ROUTER','G'],
+  ['MLM',6,1,  'LLM Engine',      'Gemini 2.5 Flash',    'LLM','G'],
+  ['MPB',6,5,  'Playbooks ×6',    'PB-001 → PB-008',     'PLAYBOOK','G'],
+  // ── ANALYSIS LAYER (col 7) ──
+  ['MCS',7,1,  'Compliance Score','0-100 · Grade A–F',   'SCORE','G'],
+  ['MRG',7,3,  'Report Generator','Full report engine',  'OUTPUT','G'],
+  // ── OUTPUT LAYER (col 8-9) ──
+  ['OEM',8,0,  'Email Delivery',  'SMTP connector',      'NOTIFY','AM'],
+  ['OTG',8,2,  'Telegram ×3',     'F / A / Fail chans.', 'NOTIFY','AM'],
+  ['OCF',8,4,  'Cloudflare WAF',  'IP block API',        'NOTIFY','AM'],
+  ['OAL',9,3,  'Audit Log',       'JSONL immutable',     'STORE','G'],
+  // ── MANAGEMENT LAYER (col 9-10) ──
+  ['OMG',9,0,  'Dashboard CLI',   'SOC status view',     'OUTPUT','G'],
+  ['OCM',10,0, 'Contract Mgr',    'MRR tracking',        'OUTPUT','G'],
+  ['OON',10,2, 'Client Onboard',  'YAML + ChromaDB',     'INPUT','G'],
+  ['OSC',10,4, 'Scheduler',       'Weekly/monthly cron', 'TRIGGER','G'],
+ ],
+ edges:[
+  // Entry → Scanning
+  ['E01','MDN','domain'],['E01','MVT','domain'],['E01','MBL','domain'],
+  ['E02','MNM','domain'],['E02','MDN','domain'],['E02','MSF','domain'],['E02','MVT','domain'],
+  ['E03','MNM','domain'],['E03','MNC','target'],['E03','MTL','domain'],
+  ['E04','MDN','domain'],['E04','MNM','domain'],
+  ['E05','MNM','all'],['E05','MNC','all'],['E05','MBL','all'],
+  ['E06','CR6','creds'],['CR6','MNM','scope'],['CR6','MNC','session'],
+  ['E07','MSG','alert'],
+  // Scanning → Aggregator
+  ['MNM','MAG',null],['MDN','MAG',null],['MNC','MAG',null],
+  ['MSF','MAG',null],['MVT','MAG',null],['MBL','MAG',null],['MTL','MAG',null],
+  // SOAR path
+  ['MSG','MAR',null],['MAR','MSD',null],
+  // Core processing
+  ['MAG','MNV',null],['MAG','MDT',null],['MAG','MNK','GRC only'],
+  ['MNV','MVS',null],['MDT','MVS',null],
+  ['MVS','MLM',null],['MLM','MCS',null],['MCS','MRG',null],
+  ['MNK','MRG','gap data'],
+  // Outputs
+  ['MRG','OEM','report'],['MRG','OTG','alert'],['MRG','OMG','latest'],
+  ['MSD','MPB','dispatch'],['MSD','OCF','block'],['MSD','OTG','notify'],
+  ['MSD','OAL','log'],['MAR','OAL','log'],
+  // Management
+  ['OMG','OCM',null],['OON','MVS','ingest'],
+  ['OSC','E05','trigger'],
+]},
+
+]; // end WFS
+
+// ═══════════════════════════════════════════════════════════════════
+// SVG BUILDER — professional n8n style
+// ═══════════════════════════════════════════════════════════════════
+function buildSVG(wf){
+  const nm={};
+  wf.nodes.forEach(n=>{
+    nm[n[0]]={x:cx(n[1]),y:cy(n[2]),title:n[3],sub:n[4],cat:n[5],st:n[6]};
+  });
+
+  const pid=wf.id;
+  let defs=`
+<marker id="${pid}sg" viewBox="0 0 12 9" refX="10" refY="4.5" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L12 4.5L0 9Z" fill="#22c55e" opacity=".75"/></marker>
+<marker id="${pid}sa" viewBox="0 0 12 9" refX="10" refY="4.5" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L12 4.5L0 9Z" fill="#f59e0b" opacity=".75"/></marker>
+<marker id="${pid}sm" viewBox="0 0 12 9" refX="10" refY="4.5" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L12 4.5L0 9Z" fill="#475569" opacity=".6"/></marker>
+<marker id="${pid}sr" viewBox="0 0 12 9" refX="10" refY="4.5" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L12 4.5L0 9Z" fill="#ef4444" opacity=".8"/></marker>
+<marker id="${pid}sc" viewBox="0 0 12 9" refX="10" refY="4.5" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L12 4.5L0 9Z" fill="#7c3aed" opacity=".8"/></marker>
+<filter id="${pid}glow"><feGaussianBlur stdDeviation="2.5" result="c"/><feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+
+  // Grid background
+  defs+=`<pattern id="${pid}grid" x="0" y="0" width="48" height="48" patternUnits="userSpaceOnUse">
+<path d="M48 0L0 0 0 48" fill="none" stroke="#0f1929" stroke-width="0.6"/>
+</pattern>`;
+
+  let svg=`<svg width="${wf.W}" height="${wf.H}" xmlns="http://www.w3.org/2000/svg">
+<defs>${defs}</defs>
+<rect width="${wf.W}" height="${wf.H}" fill="url(#${pid}grid)"/>`;
+
+  // ── EDGES (bezier curves) ──
+  wf.edges.forEach(e=>{
+    const f=nm[e[0]], t=nm[e[1]], lbl=e[2];
+    if(!f||!t) return;
+    const st=STATUS[f.st]||STATUS.GR;
+    const x1=f.x+NW, y1=f.y+NH/2;
+    const x2=t.x,    y2=t.y+NH/2;
+    const cp=Math.abs(x2-x1)*0.5;
+    const path=`M${x1},${y1} C${x1+cp},${y1} ${x2-cp},${y2} ${x2},${y2}`;
+    const isDash=f.st==='GR'||f.st==='RD';
+    svg+=`<path d="${path}" fill="none" stroke="${st.dot}" stroke-width="${f.st==='RD'?1.4:1.6}"
+      stroke-dasharray="${isDash?'5 4':'none'}" opacity="${f.st==='GR'?'.35':'.55'}"
+      marker-end="url(#${pid}${st.mkt})"/>`;
+    if(lbl){
+      const lx=(x1+x2)/2, ly=Math.min(y1,y2)-8;
+      svg+=`<rect x="${lx-22}" y="${ly-10}" width="44" height="14" rx="4" fill="#0a1020" opacity=".8"/>
+<text x="${lx}" y="${ly-1}" text-anchor="middle" fill="#64748b" font-size="8" font-family="Segoe UI,sans-serif" font-weight="500">${lbl}</text>`;
+    }
+  });
+
+  // ── NODES ──
+  wf.nodes.forEach(n=>{
+    const nd=nm[n[0]];
+    const cat=CATS[nd.cat]||CATS.PROCESS;
+    const st=STATUS[nd.st]||STATUS.GR;
+    const x=nd.x, y=nd.y;
+
+    // Glow under node for active states
+    if(nd.st!=='GR'){
+      svg+=`<rect x="${x-1}" y="${y-1}" width="${NW+2}" height="${NH+2}" rx="11"
+        fill="${st.dot}" opacity=".07"/>`;
+    }
+
+    // Main body
+    svg+=`<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="10"
+      fill="${cat.bg}" stroke="${cat.brd}" stroke-width="${nd.st==='RD'?2.2:1.4}"
+      stroke-dasharray="${nd.st==='RD'?'5 3':'none'}"/>`;
+
+    // Top accent bar (status color)
+    svg+=`<rect x="${x+10}" y="${y}" width="${NW-20}" height="2.5" rx="1.25"
+      fill="${st.dot}" opacity="${nd.st==='GR'?'.55':nd.st==='RD'?'.8':'.45'}"/>`;
+
+    // Category icon
+    svg+=`<text x="${x+13}" y="${y+26}" font-family="Segoe UI Emoji,Apple Color Emoji,sans-serif"
+      font-size="13" dominant-baseline="middle">${cat.ic}</text>`;
+
+    // Status indicator (right side, animated circle)
+    const animAttr=st.anim?`style="animation:${st.anim} 2.4s ease-in-out infinite"`:'';
+    svg+=`<circle cx="${x+NW-13}" cy="${y+14}" r="5" fill="${st.dot}" opacity=".8" ${animAttr}/>
+<circle cx="${x+NW-13}" cy="${y+14}" r="2.5" fill="#07080b" opacity=".6"/>`;
+
+    // Title
+    svg+=`<text x="${x+NW/2}" y="${y+33}" text-anchor="middle" dominant-baseline="middle"
+      font-family="Segoe UI,system-ui,sans-serif" font-size="11.5" font-weight="600"
+      fill="${nd.st==='RD'?'#fca5a5':nd.st==='GR'?'#94a3b8':'#e2e8f0'}">${nd.title}</text>`;
+
+    // Subtitle
+    svg+=`<text x="${x+NW/2}" y="${y+NH-11}" text-anchor="middle" dominant-baseline="middle"
+      font-family="Segoe UI,system-ui,sans-serif" font-size="8.5"
+      fill="${nd.st==='RD'?'#ef4444':nd.st==='AM'?'#d97706':'#475569'}">${nd.sub}</text>`;
+
+    // CRITICAL GAP badge
+    if(nd.st==='RD'){
+      svg+=`<rect x="${x}" y="${y-13}" width="${NW}" height="14" rx="4"
+        fill="rgba(239,68,68,.2)" stroke="rgba(239,68,68,.5)" stroke-width=".8"/>
+<text x="${x+NW/2}" y="${y-5.5}" text-anchor="middle" dominant-baseline="middle"
+  font-size="7.5" font-weight="700" fill="#ef4444" font-family="Segoe UI,sans-serif"
+  letter-spacing=".08em">⚠ CRITICAL GAP</text>`;
+    }
+    if(nd.st==='AM'){
+      svg+=`<rect x="${x}" y="${y-13}" width="${NW}" height="14" rx="4"
+        fill="rgba(245,158,11,.15)" stroke="rgba(245,158,11,.35)" stroke-width=".8"/>
+<text x="${x+NW/2}" y="${y-5.5}" text-anchor="middle" dominant-baseline="middle"
+  font-size="7.5" font-weight="700" fill="#d97706" font-family="Segoe UI,sans-serif"
+  letter-spacing=".08em">◐ MOCK / LIVE TEST PENDING</text>`;
+    }
+  });
+
+  svg+=`</svg>`;
+  return svg;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER + TABS
+// ═══════════════════════════════════════════════════════════════════
+function switchTab(id){
+  document.querySelectorAll('.wfp').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('pane-'+id).classList.add('on');
+  document.querySelector(`[data-id="${id}"]`).classList.add('on');
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  const tbr=document.getElementById('tbr');
+  const main=document.getElementById('main');
+
+  WFS.forEach(wf=>{
+    // Tab
+    const lbl=wf.id==='master'?'◈ Full System':wf.name.split(' · ').slice(0,2).join(' · ');
+    tbr.innerHTML+=`<div class="tab" data-id="${wf.id}" onclick="switchTab('${wf.id}')">
+      ${lbl}<span class="tbadge ${wf.bc}">${wf.pct}%</span></div>`;
+
+    // Pane
+    const progClr=wf.pct>=90?'var(--grn)':wf.pct>=70?'var(--amb)':'var(--red)';
+    const pane=document.createElement('div');
+    pane.className='wfp'; pane.id='pane-'+wf.id;
+    pane.innerHTML=`
+<div class="ibar">
+  <span class="ibar-name">${wf.name}</span>
+  <span class="ibar-badge ${wf.ibc}">${wf.badge}</span>
+  <span class="ibar-meta">${wf.meta}</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:.68rem;color:var(--txt3)">${wf.pct}%</span>
+    <div class="prog-outer"><div class="prog-inner" style="width:${wf.pct}%;background:${progClr}"></div></div>
+  </div>
+</div>
+<div class="cvs" id="cvs-${wf.id}">${buildSVG(wf)}</div>`;
+    main.appendChild(pane);
+
+    // Pan+zoom behaviour
+    setTimeout(()=>{
+      const cvs=document.getElementById('cvs-'+wf.id);
+      let drag=false,startX,startY,scrollLeft,scrollTop;
+      cvs.addEventListener('mousedown',e=>{drag=true;startX=e.pageX-cvs.offsetLeft;startY=e.pageY-cvs.offsetTop;scrollLeft=cvs.scrollLeft;scrollTop=cvs.scrollTop});
+      cvs.addEventListener('mouseleave',()=>drag=false);
+      cvs.addEventListener('mouseup',()=>drag=false);
+      cvs.addEventListener('mousemove',e=>{if(!drag)return;e.preventDefault();const x=e.pageX-cvs.offsetLeft;const y=e.pageY-cvs.offsetTop;cvs.scrollLeft=scrollLeft-(x-startX);cvs.scrollTop=scrollTop-(y-startY)});
+    },100);
+  });
+
+  switchTab('wf01');
+});
+</script>
+</body>
+</html>
